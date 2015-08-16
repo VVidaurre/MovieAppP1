@@ -2,11 +2,13 @@ package com.vvidaurre.e420.movieappp1;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
-import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -35,6 +37,7 @@ import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 
 
@@ -46,14 +49,17 @@ public class MovieFragment extends Fragment {
     private static final String OVERVIEW_EXTRA = "OVERVIEW_EXTRA";
     private static final String RELEASE_EXTRA = "RELEASE_EXTRA";
     private static final String VOTE_EXTRA = "VOTE_EXTRA";
-    private String mSort ="";
+    private static final String SORT_KEY = "mSort";
+    private static final String MOVIE_KEY = "mListMovies";
+    private String mSort;
+    private int mPosition;
     private  Toast mToast;
+    private ArrayList<Movie> mListMovies;
     public MovieFragment() {
     }
     @Override
     public void onStart(){
         super.onStart();
-        new getPopularMovies().execute(mSort);
     }
 
     @Override
@@ -76,15 +82,13 @@ public class MovieFragment extends Fragment {
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
-        savedInstanceState.putString("mSort", mSort);
+
+        savedInstanceState.putParcelableArrayList(MOVIE_KEY, (ArrayList<? extends Parcelable>) mListMovies);
+        savedInstanceState.putString(SORT_KEY, mSort);
+        savedInstanceState.putInt("mPosition", mPosition);
+
     }
 
-    @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-       if(savedInstanceState!=null && savedInstanceState.containsKey("mSort"))
-        mSort = savedInstanceState.getString("mSort");
-    }
     @Override
     public void onResume() {
         super.onResume();
@@ -95,7 +99,7 @@ public class MovieFragment extends Fragment {
     {
         inflater.inflate(R.menu.moviefragment, menu);
         MenuItem menuItem = menu.findItem(R.id.menu_spinner_sort);
-        View view = menuItem.getActionView(); // find the spinner
+        View view = menuItem.getActionView();
 
         SpinnerAdapter mSpinnerAdapter = ArrayAdapter.createFromResource(getActivity(),
                 R.array.sort_options_array, android.R.layout.simple_spinner_dropdown_item);
@@ -104,25 +108,24 @@ public class MovieFragment extends Fragment {
         {
             final Spinner spinner = (Spinner)view;
             spinner.setAdapter(mSpinnerAdapter);
+            spinner.setSelection(mPosition);
             spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                    String selectedSort = String.valueOf(parent.getItemAtPosition(position));
-                    switch (selectedSort)
-                    {
-                        case "Most Popular":
-                            mSort= "popularity.desc";
-                            break;
-                        case "Highest Rated":
-                            mSort= "vote_count.desc";
-                            break;
-                        default:
-                            mSort= "popularity.desc";
-                            break;
-                    }
-                    GridView gridView = (GridView)getActivity().findViewById(R.id.gridview_moviegrid);
+                  if(mSort != selectedSort)
+                  {
+                      mSort = selectedSort;
+                      mPosition = position;
+                      GridView gridView = (GridView)getActivity().findViewById(R.id.gridview_moviegrid);
                     gridView.smoothScrollToPosition(0);
-                    new getPopularMovies().execute(mSort);
+                      if(isNetworkAvailable())
+                          new getPopularMovies().execute();
+                      else
+                      {
+                          showToast("Error Loading Movies! No network connection available!");
+                      }
+                  }
                 }
 
                 @Override
@@ -138,8 +141,17 @@ public class MovieFragment extends Fragment {
                              Bundle savedInstanceState) {
         setHasOptionsMenu(true);
          View rootView = inflater.inflate(R.layout.fragment_movie, container, false);
-       ArrayList<Movie> listMovies = new ArrayList<Movie>();
-        mMovieAdapter = new MovieAdapter(getActivity(), listMovies);
+        if(savedInstanceState!=null && savedInstanceState.containsKey(SORT_KEY) && savedInstanceState.containsKey(MOVIE_KEY))
+        {
+            mListMovies = (ArrayList<Movie>)savedInstanceState.get(MOVIE_KEY);
+           mSort = savedInstanceState.getString(SORT_KEY, mSort);
+            mPosition = savedInstanceState.getInt("mPosition");
+        }
+        else
+        {
+            mListMovies = new ArrayList<Movie>();
+        }
+        mMovieAdapter = new MovieAdapter(getActivity(), mListMovies);
         GridView gridView = (GridView)rootView.findViewById(R.id.gridview_moviegrid);
         gridView.setAdapter(mMovieAdapter);
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -158,7 +170,13 @@ public class MovieFragment extends Fragment {
         });
         return rootView;
     }
-    public class getPopularMovies extends AsyncTask<String,Void,Movie[]>
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+    public class getPopularMovies extends AsyncTask<Void,Void,Movie[]>
     {
         private final String LOG_TAG = getPopularMovies.class.getSimpleName();
 
@@ -169,6 +187,7 @@ public class MovieFragment extends Fragment {
                 for (Movie movie : movies) {
                     mMovieAdapter.add(movie);
                 }
+                mListMovies = new ArrayList<Movie>(Arrays.asList(movies));
                 super.onPostExecute(movies);
             }
             else
@@ -177,14 +196,24 @@ public class MovieFragment extends Fragment {
             }
         }
         @Override
-        protected Movie[] doInBackground(String... strings){
+        protected Movie[] doInBackground(Void... strings){
             HttpURLConnection urlConnection = null;
             BufferedReader reader = null;
             String movieDBJsonStr = null;
-            String sort = "popularity.desc";
+            String sort;
             String MOVIEDB_SORT = "sort_by";
-            if(strings.length > 0){
-                sort= strings[0];
+
+            switch (mSort)
+            {
+                case "Most Popular":
+                    sort= "popularity.desc";
+                    break;
+                case "Highest Rated":
+                    sort= "vote_count.desc";
+                    break;
+                default:
+                    sort= "popularity.desc";
+                    break;
             }
             try
             {
