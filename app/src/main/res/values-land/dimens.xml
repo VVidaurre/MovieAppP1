@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+        <!-- Detail Fragment LandScape -->
+
+        <!-- movie_detail_title_textview -->
+        <dimen name="movie_detail_title_textview_padding">20dp</dimen>
+        <dimen name="movie_detail_title_textview_textSize">40sp</dimen>
+
+        <!-- movie_detail_poster_imageview -->
+        <dimen name="movie_detail_poster_imageview_lwidth">150dp</dimen>
+        <dimen name="movie_detail_poster_imageview_lheight">300dp</dimen>
+        <dimen name="movie_detail_poster_imageview_lmarginLeft">40dp</dimen>
+        <dimen name="movie_detail_poster_imageview_lmarginTop">10dp</dimen>
+
+        <!-- movie_detail_rdate_textview -->
+        <dimen name="movie_detail_rdate_textview_lmarginTop">40dp</dimen>
+        <dimen name="movie_detail_rdate_textview_lmarginLeft">75dp</dimen>
+        <dimen name="movie_detail_rdate_textview_textSize">35sp</dimen>
+
+        <!-- movie_detail_vote_avg_textview -->
+        <dimen name="movie_detail_vote_avg_textview_padding">16dp</dimen>
+        <dimen name="movie_detail_vote_avg_textview_lmarginLeft">75dp</dimen>
+
+        <!-- movie_detail_overview_textview -->
+        <dimen name="movie_detail_overview_textview_padding">16dp</dimen>
+        <dimen name="movie_detail_overview_textview_lmarginBottom">10dp</dimen>
+
+</resources>
